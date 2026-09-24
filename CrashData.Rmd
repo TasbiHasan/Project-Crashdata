@@ -16,7 +16,9 @@
 
 #Which roadway, traffic, vehicle and driver factors are associated with whether a Hartford-county crash results in injury/fatality rather than property damage only?
 
+#TargetVariable: Severe_Crash (property damage and fatal injury), Injured_Person_Count (Number of injured people in a crash)
 
+#IndependentVariables: Weather Condition, Road Surface, Light Condition, Hour of Day, Average Daily Traffic, Posted Speed Limit, Driver Age, Speeding Related
 
 library(ggplot2)
 library(ggplotAssist)
