@@ -1,0 +1,257 @@
+
+#datasource: https://www.ctcrash.uconn.edu/
+#geo_scope:Hartford County (29 municipalities: Avon, Berlin, Bloomfield, Bristol, Burlington, Canton, East Granby, East Hartford, East Windsor, Enfield, Farmington, Glastonbury, Granby, Hartford, Hartland, Manchester, Marlborough, New Britain, Newington, Plainville, Rocky Hill, Simsbury, Southington, South Windsor, Suffield, West Hartford, Wethersfield, Windsor, and Windsor Locks)
+
+#Total 3 datasets of Crashes in Hartford County
+
+#Timeframe: Jan. 1 to Aug. 28, 2026
+
+#baseDataset: Crash_data or ctable01, other two datasets: Vehicle_data or Ctable02 and Person_data or ctable03
+
+#Unique identifier: CrashID
+
+#PROBLEM STATEMENT: Among Hartford Country traffic crashes from January 1 to August 28, 2026, which environmental, roadway, traffic, vehicle, and driver factors are associated with (1) whether a crash results in injury/fatality rather than property damage only, and (2) the number of people injured in the crash?
+
+#or
+
+#Which roadway, traffic, vehicle and driver factors are associated with whether a Hartford-county crash results in injury/fatality rather than property damage only?
+
+
+
+library(ggplot2)
+library(ggplotAssist)
+library(rmarkdown)
+library(data.table)
+
+getwd()
+
+#assigning and importing datasets
+
+crash01 <- "https://raw.githubusercontent.com/TasbiHasan/Project-Crashdata/refs/heads/main/export_215822_0.csv"
+crash02 <- "https://raw.githubusercontent.com/TasbiHasan/Project-Crashdata/refs/heads/main/export_215822_1.csv"
+crash03 <- "https://github.com/TasbiHasan/Project-Crashdata/raw/refs/heads/main/export_215822_2.csv"
+
+#putting in dataframe
+#I tried with read.table but that didn't help. Tried to debug and got "fread" as suggestion
+
+ctable01 <- fread(file = crash01, header = TRUE, sep = ",")
+ctable02 <- fread(file = crash02, header = TRUE, sep = ",")
+ctable03 <- fread(file = crash03, header = TRUE, sep = ",")
+
+
+
+#Datafusion process states here: we looked up youtube and google first. Took Ai's help to structure the plan of action 
+
+
+```{r}
+#counting number of rows  [codehelp source: Claude]
+
+# Number of rows in each dataset
+nrow(ctable01)
+nrow(ctable02)
+nrow(ctable03)
+
+# Number of unique Crash IDs in each dataset
+uniqueN(ctable01$CrashId)
+uniqueN(ctable02$CrashId)
+uniqueN(ctable03$CrashId)
+
+```
+
+```{r}
+
+# Checking for if column names are duplicated [codehelp source: gemini]
+anyDuplicated(names(ctable01))
+anyDuplicated(names(ctable02))
+anyDuplicated(names(ctable03))
+
+```
+
+```{r}
+#identify duplicate columns [codehelp source: gemini]
+
+# Show duplicated column names in Dataset 1
+names(ctable01)[duplicated(names(ctable01))]
+
+# Show duplicated column names in Dataset 2
+names(ctable02)[duplicated(names(ctable02))]
+
+# Show duplicated column names in Dataset 3
+names(ctable03)[duplicated(names(ctable03))]
+
+```
+```{r}
+
+#Count duplicate columns [codehelp source: claude]
+
+# Dataset 1
+table(names(ctable01))[table(names(ctable01)) > 1]
+
+# Dataset 2
+table(names(ctable02))[table(names(ctable02)) > 1]
+
+# Dataset 3
+table(names(ctable03))[table(names(ctable03)) > 1]
+
+```
+
+```{r}
+
+#create working copies [Plan source: GPT, codehelp source: google]
+
+crash_data <- copy(ctable01)
+vehicle_data <- copy(ctable02)
+person_data <- copy(ctable03)
+
+```
+
+```{r}
+
+#make column names unique  [codehelp source: claude]
+
+names(crash_data) <- make.unique(
+  names(crash_data),
+  sep = "_duplicate"
+)
+
+names(vehicle_data) <- make.unique(
+  names(vehicle_data),
+  sep = "_duplicate"
+)
+
+names(person_data) <- make.unique(
+  names(person_data),
+  sep = "_duplicate"
+)
+
+```
+
+
+```{r}
+
+#verify unique column names [codehelp source: same as before]
+
+anyDuplicated(names(crash_data))
+anyDuplicated(names(vehicle_data))
+anyDuplicated(names(person_data))
+
+```
+
+```{r}
+#checking CrashID duplicaiton if or ifnot
+
+anyDuplicated(crash_data$CrashId)
+
+```
+
+
+
+```{r}
+#Checking vehicle data [raw code source: Claude]
+
+# Looking at the vehicle columns to figure out if how many vehicle is involved per crash
+
+head(
+  vehicle_data[, .(
+    CrashId,
+    VehicleId,
+    `Posted/Statutory Speed Limit`,
+    `Vehicle Model Year`,
+    `Vehicle Unit Type Text Format`
+  )]
+)
+
+#Counting Vehicle per crash
+
+vehicle_count <- vehicle_data[, .(
+  Vehicle_Count = uniqueN(VehicleId)
+), by = CrashId]
+
+head(vehicle_count)
+
+nrow(vehicle_count)
+
+uniqueN(vehicle_count$CrashId)
+
+anyDuplicated(vehicle_count$CrashId)
+
+
+#Checking speedlimits related column
+
+vehicle_data$`Posted/Statutory Speed Limit`
+
+#Observation is we don't have all the speed limits
+
+#speed limits cannot be 88/99/1 or 0 
+
+
+#In Connecticut the highest speed limit is 65 so, it can't be below 5 or above 65
+
+
+#fixing speed limits
+
+
+vehicle_data[, Speed_Limit_Clean :=
+  fifelse(
+    `Posted/Statutory Speed Limit` >= 5 &
+    `Posted/Statutory Speed Limit` <= 65,
+    `Posted/Statutory Speed Limit`,
+    NA_real_
+  )
+]
+
+summary(vehicle_data$Speed_Limit_Clean)
+
+table(vehicle_data$Speed_Limit_Clean, useNA = "ifany")
+
+
+```
+colnames(vehicle_data)
+vehicle_data$`Posted/Statutory Speed Limit`
+
+```
+
+
+#Using maximam speed limits only
+
+```{r}
+safe_max <- function(x) {
+  
+  if (all(is.na(x))) {
+    return(NA_real_)
+  }
+  
+  max(x, na.rm = TRUE)
+}
+
+
+```{r summarize-speed-limit}
+
+speed_summary <- vehicle_data[, .(
+  Posted_Speed_Limit = safe_max(Speed_Limit_Clean)
+), by = CrashId]
+
+head(speed_summary)
+vehicle_data$`Posted/Statutory Speed Limit`
+```
+
+```{r create-vehicle-summary}
+
+vehicle_summary <- merge(
+  vehicle_count,
+  speed_summary,
+  by = "CrashId",
+  all = TRUE
+)
+
+```
+
+
+
+nrow(vehicle_summary)
+
+uniqueN(vehicle_summary$CrashId)
+
+anyDuplicated(vehicle_summary$CrashId)
+
+head(vehicle_summary)
