@@ -522,4 +522,1274 @@ head(
 
 ```
 
+```{r}
+nrow(driver_vehicle_crash)
+
+uniqueN(driver_vehicle_crash$CrashId)
+
+anyDuplicated(
+  driver_vehicle_crash[, .(
+    CrashId,
+    VehicleId,
+    PersonId
+  )]
+)
+
+sum(is.na(driver_vehicle_crash$Damage_Score))
+sum(is.na(driver_vehicle_crash$Speed_Limit_Clean))
+sum(is.na(driver_vehicle_crash$Vehicle_Age))
+```
+
+```{r}
+#Importing dataset
+
+# Weather data file paths
+
+weather01 <- "C:/TASBI PROJECT ANA/weather data-20260922T095903Z-1-001/weather data/GHCNh_USW00014740_2026_converted.csv"
+
+weather02 <- "C:/TASBI PROJECT ANA/weather data-20260922T095903Z-1-001/weather data/GHCNh_USW00014752_2026.csv"
+
+```
+
+
+
+
+```{r}
+
+#Putting it into dataframe 
+weather1 <- fread(
+  file = weather01,
+  header = TRUE,
+  sep = ","
+)
+
+weather2 <- fread(
+  file = weather02,
+  header = TRUE,
+  sep = ","
+)
+
+```
+
+
+```{r}
+nrow(weather1)
+ncol(weather1)
+
+nrow(weather2)
+ncol(weather2)
+```
+
+
+```{r}
+head(names(weather1), 20)
+
+head(names(weather2), 20)
+```
+
+
+
+```{r}
+#checking if both dataset has the same column
+
+identical(
+  names(weather1),
+  names(weather2)
+)
+
+
+identical(
+  names(weather1),
+  names(weather2)
+)
+```
+
+#checking weather stations 
+
+```{r}
+unique(
+  weather1[, .(
+    STATION,
+    Station_name,
+    LATITUDE,
+    LONGITUDE
+  )]
+)
+
+unique(
+  weather2[, .(
+    STATION,
+    Station_name,
+    LATITUDE,
+    LONGITUDE
+  )]
+)
+```
+
+
+
+
+
+#we need to inspect the date and time before we go further
+
+
+```{r}
+class(weather1$DATE)
+head(weather1$DATE)
+tail(weather1$DATE)
+```
+
+```{r}
+class(weather2$DATE)
+head(weather2$DATE)
+tail(weather2$DATE)
+```
+
+#Imoprtant weather variable for us
+
+```{r}
+summary(weather1$temperature)
+summary(weather1$wind_speed)
+summary(weather1$visibility)
+
+summary(weather2$temperature)
+summary(weather2$wind_speed)
+summary(weather2$visibility)
+```
+
+
+```{r}
+
+#checking how much is missing 
+
+sum(is.na(weather1$temperature))
+sum(is.na(weather1$wind_speed))
+sum(is.na(weather1$visibility))
+
+sum(is.na(weather2$temperature))
+sum(is.na(weather2$wind_speed))
+sum(is.na(weather2$visibility))
+```
+#Combine the two weather datasets
+
+
+```{r}
+weather_all <- rbindlist(
+  list(weather1, weather2),
+  use.names = TRUE
+)
+
+nrow(weather_all)
+ncol(weather_all)
+
+uniqueN(weather_all$STATION)
+```
+
+
+#Create a smaller weather table
+
+```{r}
+weather_core <- weather_all[, .(
+  STATION,
+  Station_name,
+  DATE,
+  LATITUDE,
+  LONGITUDE,
+  temperature,
+  wind_speed,
+  visibility
+)]
+
+
+nrow(weather_core)
+
+head(weather_core)
+```
+
+
+#Checking how often the three useful weather variables appear together
+
+
+```{r}
+weather_core[, .(
+  Temperature_Available = sum(!is.na(temperature)),
+  Wind_Available = sum(!is.na(wind_speed)),
+  Visibility_Available = sum(!is.na(visibility))
+)]
+
+sum(
+  complete.cases(
+    weather_core[, .(
+      temperature,
+      wind_speed,
+      visibility
+    )]
+  )
+)
+```
+
+```{r}
+sum(
+  !is.na(weather_core$temperature) |
+  !is.na(weather_core$wind_speed) |
+  !is.na(weather_core$visibility)
+)
+```
+
+#Checking for duplicate station timestamps
+
+
+```{r}
+weather_duplicates <- weather_core[
+  ,
+  .N,
+  by = .(STATION, DATE)
+][N > 1]
+
+
+nrow(weather_duplicates)
+
+head(weather_duplicates)
+```
+#crash date and time format 
+
+
+```{r}
+class(driver_vehicle_crash$`Date Of Crash`)
+class(driver_vehicle_crash$`Time of Crash`)
+
+
+head(driver_vehicle_crash$`Date Of Crash`)
+head(driver_vehicle_crash$`Time of Crash`)
+```
+
+#creating the crash data and time 
+
+```{r}
+driver_vehicle_crash[, Crash_DateTime :=
+  as.POSIXct(
+    paste(`Date Of Crash`, `Time of Crash`),
+    format = "%Y-%m-%d %H:%M:%S",
+    tz = "America/New_York"
+  )
+]
+```
+
+```{r}
+head(driver_vehicle_crash$Crash_DateTime)
+
+class(driver_vehicle_crash$Crash_DateTime)
+
+sum(is.na(driver_vehicle_crash$Crash_DateTime))
+```
+```{r}
+attr(weather_core$DATE, "tzone")
+
+head(weather_core$DATE)
+```
+
+
+#comparing the timezone
+
+
+```{r}
+head(
+  format(
+    driver_vehicle_crash$Crash_DateTime,
+    tz = "America/New_York",
+    usetz = TRUE
+  )
+)
+
+
+head(
+  format(
+    driver_vehicle_crash$Crash_DateTime,
+    tz = "UTC",
+    usetz = TRUE
+  )
+)
+```
+
+
+#creating data table
+
+
+```{r}
+weather_match <- weather_core[
+  !is.na(temperature) &
+  !is.na(wind_speed) &
+  !is.na(visibility)
+]
+```
+
+
+```{r}
+nrow(weather_match)
+
+uniqueN(weather_match$STATION)
+
+range(weather_match$DATE)
+```
+
+```{r}
+weather_match[, .N, by = STATION]
+```
+
+```{r}
+unique(
+  weather_match[, .(
+    STATION,
+    Station_name,
+    LATITUDE,
+    LONGITUDE
+  )]
+)
+```
+
+#Create a crash-level weather matching table
+```{r}
+crashes_for_weather <- unique(
+  driver_vehicle_crash[, .(
+    CrashId,
+    Crash_DateTime,
+    Crash_Latitude = Latitude,
+    Crash_Longitude = Longitude
+  )]
+)
+```
+
+
+```{r}
+nrow(crashes_for_weather)
+
+uniqueN(crashes_for_weather$CrashId)
+
+anyDuplicated(crashes_for_weather$CrashId)
+```
+
+#Create a table containing the two weather stations
+
+```{r}
+weather_stations <- unique(
+  weather_match[, .(
+    STATION,
+    Station_name,
+    Station_Latitude = LATITUDE,
+    Station_Longitude = LONGITUDE
+  )]
+)
+
+print(weather_stations)
+nrow(weather_stations)
+```
+
+#now creating distance function
+
+
+```{r}
+haversine_km <- function(lat1, lon1, lat2, lon2) {
+  
+  R <- 6371
+  
+  lat1 <- lat1 * pi / 180
+  lon1 <- lon1 * pi / 180
+  lat2 <- lat2 * pi / 180
+  lon2 <- lon2 * pi / 180
+  
+  dlat <- lat2 - lat1
+  dlon <- lon2 - lon1
+  
+  a <- sin(dlat / 2)^2 +
+    cos(lat1) * cos(lat2) *
+    sin(dlon / 2)^2
+  
+  c <- 2 * atan2(
+    sqrt(a),
+    sqrt(1 - a)
+  )
+  
+  R * c
+}
+```
+
+#now we would calculate the distance between both stations
+
+#first station 
+
+```{r}
+crashes_for_weather[, Distance_Station1_km :=
+  haversine_km(
+    Crash_Latitude,
+    Crash_Longitude,
+    weather_stations$Station_Latitude[1],
+    weather_stations$Station_Longitude[1]
+  )
+]
+```
+
+#second station 
+
+```{r}
+crashes_for_weather[, Distance_Station2_km :=
+  haversine_km(
+    Crash_Latitude,
+    Crash_Longitude,
+    weather_stations$Station_Latitude[2],
+    weather_stations$Station_Longitude[2]
+  )
+]
+```
+
+```{r}
+summary(
+  crashes_for_weather$Distance_Station1_km
+)
+
+summary(
+  crashes_for_weather$Distance_Station2_km
+)
+```
+
+#now we will assign the nearest station 
+
+```{r}
+crashes_for_weather[, Nearest_Station :=
+  fifelse(
+    Distance_Station1_km <= Distance_Station2_km,
+    weather_stations$STATION[1],
+    weather_stations$STATION[2]
+  )
+]
+```
+
+#and creating the actual nearest distance
+
+```{r}
+crashes_for_weather[, Nearest_Station_Distance_km :=
+  pmin(
+    Distance_Station1_km,
+    Distance_Station2_km
+  )
+]
+```
+
+
+```{r}
+table(
+  crashes_for_weather$Nearest_Station
+)
+
+summary(
+  crashes_for_weather$Nearest_Station_Distance_km
+)
+
+
+quantile(
+  crashes_for_weather$Nearest_Station_Distance_km,
+  probs = c(0, .25, .50, .75, .90, .95, 1),
+  na.rm = TRUE
+)
+
+
+```
+
+
+#now we move to matching the time 
+
+
+```{r}
+weather_for_join <- weather_match[, .(
+  STATION,
+  Join_Time = DATE,
+  Weather_Observed_UTC = DATE,
+  temperature,
+  wind_speed,
+  visibility
+)]
+
+setkey(
+  weather_for_join,
+  STATION,
+  Join_Time
+)
+```
+
+```{r}
+nrow(weather_for_join)
+
+head(weather_for_join)
+```
+
+
+
+#preparing crash time for matching 
+
+
+```{r}
+crash_weather_request <- crashes_for_weather[, .(
+  CrashId,
+  STATION = Nearest_Station,
+  Crash_DateTime,
+  Crash_Time_UTC = as.POSIXct(
+    as.numeric(Crash_DateTime),
+    origin = "1970-01-01",
+    tz = "UTC"
+  ),
+  Nearest_Station_Distance_km
+)]
+
+crash_weather_request[, Join_Time := Crash_Time_UTC]
+```
+
+```{r}
+head(
+  crash_weather_request[, .(
+    CrashId,
+    STATION,
+    Crash_DateTime,
+    Crash_Time_UTC,
+    Nearest_Station_Distance_km
+  )]
+)
+```
+
+
+
+#matching each crash to nearest weather observation 
+
+
+```{r}
+weather_nearest <- weather_for_join[
+  crash_weather_request,
+  on = .(
+    STATION,
+    Join_Time
+  ),
+  roll = "nearest"
+]
+
+
+
+nrow(weather_nearest)
+
+uniqueN(weather_nearest$CrashId)
+
+anyDuplicated(weather_nearest$CrashId)
+```
+
+#Calculating how far apart the crash and weather times are
+
+
+```{r}
+weather_nearest[, Weather_Time_Diff_Min :=
+  abs(
+    as.numeric(
+      difftime(
+        Weather_Observed_UTC,
+        Crash_Time_UTC,
+        units = "mins"
+      )
+    )
+  )
+]
+
+summary(
+  weather_nearest$Weather_Time_Diff_Min
+)
+
+
+
+
+quantile(
+  weather_nearest$Weather_Time_Diff_Min,
+  probs = c(
+    0,
+    .25,
+    .50,
+    .75,
+    .90,
+    .95,
+    .99,
+    1
+  ),
+  na.rm = TRUE
+)
+```
+
+```{r}
+weather_nearest[, .(
+  Within_30_Min = sum(Weather_Time_Diff_Min <= 30),
+  Within_60_Min = sum(Weather_Time_Diff_Min <= 60),
+  Within_90_Min = sum(Weather_Time_Diff_Min <= 90),
+  Over_90_Min   = sum(Weather_Time_Diff_Min > 90)
+)]
+```
+
+#worst matches 
+
+```{r}
+head(
+  weather_nearest[
+    order(-Weather_Time_Diff_Min),
+    .(
+      CrashId,
+      STATION,
+      Crash_DateTime,
+      Weather_Observed_UTC,
+      Weather_Time_Diff_Min
+    )
+  ],
+  10
+)
+```
+
+
+#checking how many are over 60 mins time gap
+
+
+```{r}
+weather_nearest[, .(
+  Within_30_Min = sum(Weather_Time_Diff_Min <= 30),
+  Within_60_Min = sum(Weather_Time_Diff_Min <= 60),
+  Over_60_Min   = sum(Weather_Time_Diff_Min > 60)
+)]
+```
+```{r}
+
+weather_nearest[
+  Weather_Time_Diff_Min > 60,
+  .(
+    CrashId,
+    STATION,
+    Crash_DateTime,
+    Weather_Observed_UTC,
+    Weather_Time_Diff_Min,
+    temperature,
+    wind_speed,
+    visibility
+  )
+][order(-Weather_Time_Diff_Min)]
+
+```
+
+
+
+#We should not delete the crashes.Instead, if the nearest weather reading is more than 60 minutes away, we mark the weather values as missing
+
+
+```{r}
+weather_nearest[
+  Weather_Time_Diff_Min > 60,
+  `:=`(
+    temperature = NA_real_,
+    wind_speed = NA_real_,
+    visibility = NA_real_
+  )
+]
+```
+#We should not pretend that old observation represents the crash weather.
+
+
+
+```{r}
+sum(is.na(weather_nearest$temperature))
+sum(is.na(weather_nearest$wind_speed))
+sum(is.na(weather_nearest$visibility))
+```
+
+#creating final weather columns 
+
+```{r}
+weather_final <- weather_nearest[, .(
+  CrashId,
+  Weather_Station = STATION,
+  Weather_Station_Distance_km = Nearest_Station_Distance_km,
+  Weather_Time_Diff_Min,
+  Temperature = temperature,
+  Wind_Speed = wind_speed,
+  Visibility = visibility
+)]
+```
+
+
+```{r}
+nrow(weather_final)
+
+uniqueN(weather_final$CrashId)
+
+anyDuplicated(weather_final$CrashId)
+```
+
+
+
+#FUSING THE DATASET
+
+
+```{r}
+final_fused_data <- merge(
+  driver_vehicle_crash,
+  weather_final,
+  by = "CrashId",
+  all.x = TRUE,
+  sort = FALSE
+)
+
+```
+
+```{r}
+nrow(final_fused_data)
+
+uniqueN(final_fused_data$CrashId)
+
+anyDuplicated(
+  final_fused_data[, .(
+    CrashId,
+    VehicleId,
+    PersonId
+  )]
+)
+```
+#checking the weather dataset
+
+```{r}
+sum(is.na(final_fused_data$Temperature))
+sum(is.na(final_fused_data$Wind_Speed))
+sum(is.na(final_fused_data$Visibility))
+
+
+
+summary(final_fused_data$Temperature)
+summary(final_fused_data$Wind_Speed)
+summary(final_fused_data$Visibility)
+
+
+
+
+
+```
+
+```{r}
+
+#checking driver injury categories 
+
+table(
+  final_fused_data$`Injury Status Text Format`,
+  useNA = "ifany"
+)
+```
+
+#creating DEPENDENT VARIABLE 01 
+
+```{r}
+
+final_fused_data[, Driver_Injury :=
+  fcase(
+    `Injury Status Text Format` == "No Apparent Injury (O)", 0,
+    
+    `Injury Status Text Format` %in% c(
+      "Possible Injury (C)",
+      "Suspected Minor Injury (B)",
+      "Suspected Serious Injury (A)",
+      "Fatal Injury (K)"
+    ), 1,
+    
+    default = NA_real_
+  )
+]
+
+#review
+table(
+  final_fused_data$Driver_Injury,
+  useNA = "ifany"
+)
+
+
+#percentage
+
+prop.table(
+  table(final_fused_data$Driver_Injury)
+) * 100
+```
+
+#checking both targets togather
+
+```{r}
+table(
+  Driver_Injury = final_fused_data$Driver_Injury,
+  Damage_Score = final_fused_data$Damage_Score,
+  useNA = "ifany"
+)
+```
+
+#We would inspect our variables to check if we can use them 
+
+
+```{r}
+table(
+  final_fused_data$`Light Condition Text Format`,
+  useNA = "ifany"
+)
+
+table(
+  final_fused_data$`Road Surface Condition Text Format`,
+  useNA = "ifany"
+)
+
+table(
+  final_fused_data$`Type of Intersection Text Format`,
+  useNA = "ifany"
+)
+```
+
+#numericals
+
+```{r}
+table(
+  final_fused_data$`Roadway Alignment Text Format`,
+  useNA = "ifany"
+)
+
+table(
+  final_fused_data$`Roadway Grade Text Format`,
+  useNA = "ifany"
+)
+```
+
+
+
+#numericals 
+
+
+```{r}
+summary(final_fused_data$Speed_Limit_Clean)
+
+summary(final_fused_data$Vehicle_Age)
+
+summary(final_fused_data$`Total Lanes In Roadway`)
+
+summary(final_fused_data$Temperature)
+
+summary(final_fused_data$Wind_Speed)
+
+summary(final_fused_data$Visibility)
+
+summary(final_fused_data$`Hour of the Day`)
+```
+
+
+#checking missing values 
+
+```{r}
+final_fused_data[, .(
+  Missing_Speed_Limit = sum(is.na(Speed_Limit_Clean)),
+  Missing_Vehicle_Age = sum(is.na(Vehicle_Age)),
+  Missing_Total_Lanes = sum(is.na(`Total Lanes In Roadway`)),
+  Missing_Temperature = sum(is.na(Temperature)),
+  Missing_Wind = sum(is.na(Wind_Speed)),
+  Missing_Visibility = sum(is.na(Visibility))
+)]
+```
+
+
+
+
+
+#creating variable dark condition 
+
+```{r}
+final_fused_data[, Dark_Condition :=
+  fcase(
+    `Light Condition Text Format` %in% c(
+      "Dark-Lighted",
+      "Dark-Not Lighted",
+      "Dark-Unknown Lighting"
+    ), 1,
+
+    `Light Condition Text Format` %in% c(
+      "Daylight",
+      "Dawn",
+      "Dusk"
+    ), 0,
+
+    default = NA_real_
+  )
+]
+
+
+table(
+  final_fused_data$Dark_Condition,
+  useNA = "ifany"
+)
+```
+
+
+#Adverse Road Condition
+
+
+
+```{r}
+final_fused_data[, Adverse_Road :=
+  fcase(
+    `Road Surface Condition Text Format` == "Dry", 0,
+
+    `Road Surface Condition Text Format` %in% c(
+      "Wet",
+      "Ice / Frost",
+      "Slush",
+      "Snow",
+      "Standing Water",
+      "Moving Water",
+      "Mud, Dirt, Gravel",
+      "Sand"
+    ), 1,
+
+    default = NA_real_
+  )
+]
+
+
+
+
+table(
+  final_fused_data$Adverse_Road,
+  useNA = "ifany"
+)
+
+```
+
+
+#Intersection indicator
+
+
+```{r}
+
+final_fused_data[, At_Intersection :=
+  fcase(
+    `Type of Intersection Text Format` ==
+      "Not at Intersection", 0,
+
+    `Type of Intersection Text Format` %in% c(
+      "Four-Way Intersection",
+      "T-Intersection",
+      "Y-Intersection",
+      "L-Intersection",
+      "Five-Point, or More",
+      "Roundabout",
+      "Traffic Circle"
+    ), 1,
+
+    default = NA_real_
+  )
+]
+
+
+table(
+  final_fused_data$At_Intersection,
+  useNA = "ifany"
+)
+
+
+```
+
+
+#roadway alignment variable
+
+
+```{r}
+final_fused_data[, Curved_Road :=
+  fcase(
+    `Roadway Alignment Text Format` == "Straight", 0,
+
+    `Roadway Alignment Text Format` %in% c(
+      "Curve Left",
+      "Curve Right"
+    ), 1,
+
+    default = NA_real_
+  )
+]
+
+
+table(
+  final_fused_data$Curved_Road,
+  useNA = "ifany"
+)
+```
+
+
+#roadway grade variable
+
+
+```{r}
+
+
+final_fused_data[, Non_Level_Road :=
+  fcase(
+    `Roadway Grade Text Format` == "Level", 0,
+
+    `Roadway Grade Text Format` %in% c(
+      "Downhill",
+      "Uphill",
+      "Hillcrest",
+      "Sag (bottom)"
+    ), 1,
+
+    default = NA_real_
+  )
+]
+
+
+
+table(
+  final_fused_data$Non_Level_Road,
+  useNA = "ifany"
+)
+
+```
+
+```{r}
+table(final_fused_data$Dark_Condition, useNA = "ifany")
+
+table(final_fused_data$Adverse_Road, useNA = "ifany")
+
+table(final_fused_data$At_Intersection, useNA = "ifany")
+
+table(final_fused_data$Curved_Road, useNA = "ifany")
+
+table(final_fused_data$Non_Level_Road, useNA = "ifany")
+```
+
+
+#cleaning lanes 
+
+
+```{r}
+final_fused_data[, Total_Lanes_Clean :=
+  fifelse(
+    `Total Lanes In Roadway` > 0,
+    as.numeric(`Total Lanes In Roadway`),
+    NA_real_
+  )
+]
+
+table(
+  final_fused_data$Total_Lanes_Clean,
+  useNA = "ifany"
+)
+```
+```{r}
+summary(final_fused_data$Total_Lanes_Clean)
+```
+
+#building the first predictor dataset
+
+```{r}
+correlation_candidates <- final_fused_data[, .(
+  Temperature,
+  Wind_Speed,
+  Visibility,
+  Dark_Condition,
+  Adverse_Road,
+  At_Intersection,
+  Speed_Limit_Clean,
+  Vehicle_Age,
+  Curved_Road,
+  Non_Level_Road,
+  Total_Lanes_Clean,
+  Hour_of_Day = `Hour of the Day`
+)]
+```
+
+#checking missing values before correlation matrix 
+
+```{r}
+colSums(
+  is.na(correlation_candidates)
+)
+```
+
+```{r}
+nrow(correlation_candidates)
+
+sum(
+  complete.cases(correlation_candidates)
+)
+```
+
+#correlation matrix 
+
+
+```{r}
+cor_matrix <- cor(
+  correlation_candidates,
+  use = "pairwise.complete.obs",
+  method = "pearson"
+)
+
+round(cor_matrix, 2)
+```
+
+#finding the correlation above .50
+
+```{r}
+high_correlations <- which(
+  abs(cor_matrix) >= 0.50 &
+  abs(cor_matrix) < 1,
+  arr.ind = TRUE
+)
+high_correlations
+
+cor_matrix
+```
+
+
+#supecious lane 
+```{r}
+table(
+  final_fused_data$Total_Lanes_Clean,
+  useNA = "ifany"
+)
+```
+
+
+```{r}
+final_fused_data[
+  Total_Lanes_Clean >= 10,
+  .(
+    CrashId,
+    VehicleId,
+    Total_Lanes_Clean,
+    `Roadway Alignment Text Format`,
+    Speed_Limit_Clean
+  )
+]
+```
+
+
+#creating the reduced 10 variable predictor set
+
+
+```{r}
+final_predictor_candidates <- final_fused_data[, .(
+  Temperature,
+  Wind_Speed,
+  Dark_Condition,
+  Adverse_Road,
+  At_Intersection,
+  Speed_Limit_Clean,
+  Vehicle_Age,
+  Curved_Road,
+  Non_Level_Road,
+  Total_Lanes_Clean
+)]
+```
+
+
+#Running Correlation matrix again 
+
+
+
+```{r}
+final_cor_matrix <- cor(
+  final_predictor_candidates,
+  use = "pairwise.complete.obs",
+  method = "pearson"
+)
+
+round(final_cor_matrix, 2)
+```
+
+#checking for high correlation 
+
+
+```{r}
+final_high_correlations <- which(
+  abs(final_cor_matrix) >= 0.50 &
+  abs(final_cor_matrix) < 1,
+  arr.ind = TRUE
+)
+
+final_high_correlations
+```
+
+```{r}
+colSums(
+  is.na(final_predictor_candidates)
+)
+
+sum(
+  complete.cases(final_predictor_candidates)
+)
+```
+
+creating VIF dataset
+```{r}
+vif_data <- na.omit(
+  final_predictor_candidates
+)
+
+nrow(vif_data)
+```
+```{r}
+calculate_vif <- function(data) {
+  
+  vif_results <- numeric(ncol(data))
+  names(vif_results) <- names(data)
+  
+  for (variable in names(data)) {
+    
+    other_variables <- setdiff(
+      names(data),
+      variable
+    )
+    
+    formula_vif <- as.formula(
+      paste(
+        variable,
+        "~",
+        paste(other_variables, collapse = " + ")
+      )
+    )
+    
+    model_vif <- lm(
+      formula_vif,
+      data = data
+    )
+    
+    r_squared <- summary(model_vif)$r.squared
+    
+    vif_results[variable] <- 1 / (1 - r_squared)
+  }
+  
+  return(vif_results)
+}
+
+
+vif_results <- calculate_vif(vif_data)
+
+round(vif_results, 2)
+
+
+
+```
+
+
+
+#DOWNLOADING THE DATA
+
+
+```{r}
+getwd()
+
+fwrite(
+  final_fused_data,
+  "final_fused_driver_crash_weather_2026.csv"
+)
+
+file.exists(
+  "final_fused_driver_crash_weather_2026.csv"
+)
+
+```
 
