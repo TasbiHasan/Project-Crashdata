@@ -1793,3 +1793,255 @@ file.exists(
 
 ```
 
+#Descriptive analysis
+
+#driver injury
+
+```{r}
+injury_descriptive <- final_fused_data[
+  ,
+  .N,
+  by = Driver_Injury
+]
+
+injury_descriptive[
+  ,
+  Percentage := round(N / sum(N) * 100, 2)
+]
+
+injury_descriptive
+```
+
+
+
+
+#Vehicle damage severity 
+
+```{r}
+damage_descriptive <- final_fused_data[
+  !is.na(Damage_Score),
+  .N,
+  by = Damage_Score
+]
+
+damage_descriptive[
+  ,
+  Percentage := round(N / sum(N) * 100, 2)
+]
+
+damage_descriptive
+```
+
+
+
+
+
+
+#numerical statistics
+
+```{r}
+numeric_descriptive <- final_fused_data[, .(
+  
+  Temperature_Mean = round(mean(Temperature, na.rm = TRUE), 2),
+  Temperature_SD = round(sd(Temperature, na.rm = TRUE), 2),
+  Temperature_Median = round(median(Temperature, na.rm = TRUE), 2),
+  
+  Wind_Mean = round(mean(Wind_Speed, na.rm = TRUE), 2),
+  Wind_SD = round(sd(Wind_Speed, na.rm = TRUE), 2),
+  Wind_Median = round(median(Wind_Speed, na.rm = TRUE), 2),
+  
+  Speed_Limit_Mean = round(mean(Speed_Limit_Clean, na.rm = TRUE), 2),
+  Speed_Limit_SD = round(sd(Speed_Limit_Clean, na.rm = TRUE), 2),
+  Speed_Limit_Median = median(Speed_Limit_Clean, na.rm = TRUE),
+  
+  Vehicle_Age_Mean = round(mean(Vehicle_Age, na.rm = TRUE), 2),
+  Vehicle_Age_SD = round(sd(Vehicle_Age, na.rm = TRUE), 2),
+  Vehicle_Age_Median = median(Vehicle_Age, na.rm = TRUE),
+  
+  Total_Lanes_Mean = round(mean(Total_Lanes_Clean, na.rm = TRUE), 2),
+  Total_Lanes_Median = median(Total_Lanes_Clean, na.rm = TRUE)
+)]
+
+numeric_descriptive
+```
+
+
+
+#percentage 
+
+
+```{r}
+dark_descriptive <- final_fused_data[
+  !is.na(Dark_Condition),
+  .N,
+  by = Dark_Condition
+]
+
+dark_descriptive[
+  ,
+  Percentage := round(N / sum(N) * 100, 2)
+]
+
+dark_descriptive
+```
+
+
+
+
+
+#adverse road 
+
+```{r}
+
+road_descriptive <- final_fused_data[
+  !is.na(Adverse_Road),
+  .N,
+  by = Adverse_Road
+]
+
+road_descriptive[
+  ,
+  Percentage := round(N / sum(N) * 100, 2)
+]
+
+road_descriptive
+
+```
+
+
+
+
+
+#intersection 
+
+
+```{r}
+intersection_descriptive <- final_fused_data[
+  !is.na(At_Intersection),
+  .N,
+  by = At_Intersection
+]
+
+intersection_descriptive[
+  ,
+  Percentage := round(N / sum(N) * 100, 2)
+]
+
+intersection_descriptive
+```
+
+
+
+#injury by road 
+
+```{r}
+injury_by_road <- final_fused_data[
+  !is.na(Adverse_Road),
+  .(
+    Drivers = .N,
+    Injured_Drivers = sum(Driver_Injury == 1),
+    Injury_Percentage = round(
+      mean(Driver_Injury == 1) * 100,
+      2
+    )
+  ),
+  by = Adverse_Road
+]
+
+injury_by_road
+```
+
+
+
+#by lighting 
+
+```{r}
+injury_by_light <- final_fused_data[
+  !is.na(Dark_Condition),
+  .(
+    Drivers = .N,
+    Injured_Drivers = sum(Driver_Injury == 1),
+    Injury_Percentage = round(
+      mean(Driver_Injury == 1) * 100,
+      2
+    )
+  ),
+  by = Dark_Condition
+]
+
+injury_by_light
+```
+
+
+
+#by intersection 
+
+```{r}
+injury_by_intersection <- final_fused_data[
+  !is.na(At_Intersection),
+  .(
+    Drivers = .N,
+    Injured_Drivers = sum(Driver_Injury == 1),
+    Injury_Percentage = round(
+      mean(Driver_Injury == 1) * 100,
+      2
+    )
+  ),
+  by = At_Intersection
+]
+
+injury_by_intersection
+
+```
+
+
+#summary
+
+
+```{r}
+final_fused_data[
+  !is.na(Damage_Score),
+  .(
+    Vehicles = .N,
+    Mean_Damage_Score = round(
+      mean(Damage_Score),
+      2
+    ),
+    Median_Damage_Score = median(Damage_Score)
+  )
+]
+```
+
+```{r}
+damage_by_road <- final_fused_data[
+  !is.na(Damage_Score) &
+  !is.na(Adverse_Road),
+  .(
+    Vehicles = .N,
+    Mean_Damage_Score = round(
+      mean(Damage_Score),
+      2
+    ),
+    Median_Damage_Score = median(Damage_Score)
+  ),
+  by = Adverse_Road
+]
+
+damage_by_road
+```
+
+
+```{r}
+
+injury_descriptive
+damage_descriptive
+numeric_descriptive
+
+injury_by_road
+injury_by_light
+injury_by_intersection
+
+
+
+```
+
